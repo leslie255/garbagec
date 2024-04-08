@@ -102,7 +102,6 @@ GcPtr gc_clone(GcPtr p) {
 static inline bool gcobject_alive(GcPtr object) { return object.metadata->strong_count != 0; }
 
 static inline void gcarena_sweep_refs(GcArena *self, GcPtr object) {
-  /// TODO: This could be optimized by not sweeping objects we've already sweeped before on this round.
   if (!gcobject_alive(object)) {
     for (usize i = 0; i < object.metadata->reflist.len; i++) {
       GcPtr object_ = *get_item_objlist(&object.metadata->reflist, i);
