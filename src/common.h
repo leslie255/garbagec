@@ -42,13 +42,13 @@ void _lbvm_print_stacktrace() {
 /// Assert with stacktrace on failure.
 #define ASSERT(COND)                                                                                                   \
   (((COND))                                                                                                            \
-       ? COND                                                                                                          \
+       ? 0                                                                                                             \
        : (fprintf(stderr, "[%s@%s:%d] Assertion failed: (" #COND ") == false\n", __FUNCTION__, __FILE__, __LINE__),    \
           _lbvm_print_stacktrace(), exit(1)))
 /// Assert with stacktrace and print message on failure.
 #define ASSERT_PRINT(COND, ...)                                                                                        \
   (((COND))                                                                                                            \
-       ? COND                                                                                                          \
+       ? 0                                                                                                             \
        : (fprintf(stderr, "[%s@%s:%d] Assertion failed: (" #COND ") == false\n", __FUNCTION__, __FILE__, __LINE__),    \
           fprintf(stderr, __VA_ARGS__), _lbvm_print_stacktrace(), exit(1)))
 
@@ -56,18 +56,18 @@ void _lbvm_print_stacktrace() {
 /// Assert only in debug mode with stacktrace on failure.
 #define DEBUG_ASSERT(COND)                                                                                             \
   (((COND))                                                                                                            \
-       ? COND                                                                                                          \
+       ? 0                                                                                                             \
        : (fprintf(stderr, "[%s@%s:%d] Assertion failed: (" #COND ") == false\n", __FUNCTION__, __FILE__, __LINE__),    \
           _lbvm_print_stacktrace(), exit(1)))
 /// Assert only in debug mode with stacktrace and print message on failure.
 #define DEBUG_ASSERT_PRINT(COND, ...)                                                                                  \
   (((COND))                                                                                                            \
-       ? COND                                                                                                          \
+       ? 0                                                                                                             \
        : (fprintf(stderr, "[%s@%s:%d] Assertion failed: (" #COND ") == false\n", __FUNCTION__, __FILE__, __LINE__),    \
           fprintf(stderr, __VA_ARGS__), _lbvm_print_stacktrace(), exit(1)))
 #else
-#define DEBUG_ASSERT(COND) COND
-#define DEBUG_ASSERT_PRINT(COND, ...) COND
+#define DEBUG_ASSERT(COND) 0
+#define DEBUG_ASSERT_PRINT(COND, ...) 0
 #endif
 
 #define PANIC()                                                                                                        \
