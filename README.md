@@ -8,15 +8,21 @@ For now it's not hygienically packaged into a library.
 
 ## Demo
 
-Note that this requires `common.h` and `debug_utils.h`, as well as `#define DEBUG_LOG`.
+Note that this demo code requires `common.h` and `debug_utils.h`, as well as `#define DEBUG_LOG` so the `gc_sweep`
+function logs what objects are destroyed.
 
 ```c
+
+/// A TestObj has two child i32 values allocated in GC arena.
 typedef struct test_obj {
   GcPtr child_i32_0;
   GcPtr child_i32_1;
 } TestObj;
 
+/// A GC object needs to have a reflist for all child objects it has.
+/// `reflist`s takes the type of `ObjList`, a dynamic array of `GcPtr`s.
 ObjList test_obj_reflist(TestObj *self) {
+  /// `DEBUG_ASSERT` is a macro defined in `common.h`.
   DEBUG_ASSERT(self->child_i32_0.obj != nullptr);
   DEBUG_ASSERT(self->child_i32_1.obj != nullptr);
   ObjList reflist = new_with_capacity_objlist(2);
@@ -30,6 +36,7 @@ i32 main() {
 
   // Create number0 object.
   i32 number0_ = 10;
+  // `PUT_ON_HEAP` is a macro in `common.h` for boxing a value onto the heap.
   GcPtr number0 = gc_new_object(&arena,
                                 PUT_ON_HEAP(number0_),
                                 new_objlist(),
@@ -42,7 +49,8 @@ i32 main() {
                                 new_objlist(),
                                 NO_DESTORY_CALLBACK);
 
-  // Create test_obj1 object.
+  // Create test_obj1 object which contains one alias of `number0` and
+  // `number1`.
   TestObj test_obj1_ = (TestObj){
     .child_i32_0 = gc_clone(number0),
     .child_i32_1 = gc_clone(number1),
@@ -52,9 +60,11 @@ i32 main() {
                                   test_obj_reflist(&test_obj1_),
                                   NO_DESTORY_CALLBACK);
 
-  // Create test_obj2 object.
+  // Create `test_obj1` object which contains another alias (but the same copy
+  // in memory!) of `number0` and `number1`.
   TestObj test_obj2_ = (TestObj){
-    .child_i32_0 = number0,
+    .child_i32_0 = number0, // Unlike for `test_obj1`, here we're moving the
+                            // number objects into `test_obj2`.
     .child_i32_1 = number1,
   };
   GcPtr test_obj2 = gc_new_object(&arena,
@@ -73,7 +83,7 @@ i32 main() {
   // which objects are destroyed.
   gc_sweep(&arena); // Expect: No objects are destroyed.
   gc_mark_dead(test_obj1);
-  gc_sweep(&arena); // Expect: `test_obj` is destroyed.
+  gc_sweep(&arena); // Expect: `test_obj1` is destroyed.
   gc_mark_dead(test_obj2);
   gc_sweep(&arena); // Expect: `test_obj2`, `number0`, `number1` are destroyed.
   gc_sweep(&arena); // Expect: No Objects are destroyed.
