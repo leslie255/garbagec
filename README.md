@@ -1,28 +1,72 @@
-# Leslie255's Bytecode Virtual Machine
+# GarbageC
 
-I made this VM so I can submit my C coursework in the form of a bunch of bytecode and a `machine.h` file.
-It is not made as a "useful" bytecode VM hence some of the design choices.
+**Tracing GC (a.k.a. Mark & Sweep GC) implemented in C**
 
-See [manual.md](manual.md) for design of the Bytecode VM.
+It is designed for a possible future programming language project.
 
-Currently everything except `native_call` instruction works (so you can't call a local native function in the bytecode, but you can call libc functions).
+For now it's not hygienically packaged into a library.
 
-Assembler is available at: [leslie255/lbvm_asm](https://github.com/leslie255/lbvm_asm).
+## Demo
 
-## Usage
+Note that this requires `common.h` and `debug_utils.h`, as well as `#define DEBUG_LOG`.
 
-For UNIX-like systems:
+```c
+typedef struct test_obj {
+  GcPtr child_i32_0;
+  GcPtr child_i32_1;
+} TestObj;
 
-```bash
-# Clone the repo
-$ git clone https://github.com/leslie255/lbvm.git
+ObjList test_obj_reflist(TestObj *self) {
+  DEBUG_ASSERT(self->child_i32_0.obj != nullptr);
+  DEBUG_ASSERT(self->child_i32_1.obj != nullptr);
+  ObjList reflist = new_with_capacity_objlist(2);
+  push_objlist(&reflist, self->child_i32_0);
+  push_objlist(&reflist, self->child_i32_1);
+  return reflist;
+}
 
-# Cd to the repo
-$ cd lbvm
+i32 main() {
+  GcArena arena = gc_new_arena();
 
-# Use run.py for quickly running an assembly file
-# run.py manages the set up work on the first run
-$ python3 run.py test.s
+  // Create number0 object.
+  i32 number0_ = 10;
+  GcPtr number0 = gc_new_object(&arena, PUT_ON_HEAP(number0_), new_objlist(), NO_DESTORY_CALLBACK);
+
+  // Create number1 object.
+  i32 number1_ = 255;
+  GcPtr number1 = gc_new_object(&arena, PUT_ON_HEAP(number1_), new_objlist(), NO_DESTORY_CALLBACK);
+
+  // Create test_obj1 object.
+  TestObj test_obj1_ = (TestObj){
+      .child_i32_0 = gc_clone(number0),
+      .child_i32_1 = gc_clone(number1),
+  };
+  GcPtr test_obj1 = gc_new_object(&arena, PUT_ON_HEAP(test_obj1_), test_obj_reflist(&test_obj1_), NO_DESTORY_CALLBACK);
+
+  // Create test_obj2 object.
+  TestObj test_obj2_ = (TestObj){
+      .child_i32_0 = number0,
+      .child_i32_1 = number1,
+  };
+  GcPtr test_obj2 = gc_new_object(&arena, PUT_ON_HEAP(test_obj2_), test_obj_reflist(&test_obj2_), NO_DESTORY_CALLBACK);
+
+  // Print out addresses of GC pointers so later we can see which objects are destroyed.
+  DBG_PRINTF("number0   = "); println_gcptr_addr(number0);
+  DBG_PRINTF("number1   = "); println_gcptr_addr(number1);
+  DBG_PRINTF("test_obj1 = "); println_gcptr_addr(test_obj1);
+  DBG_PRINTF("test_obj2 = "); println_gcptr_addr(test_obj2);
+
+  // Since we defined `DEBUG_LOG` ealier the `gc_sweep` functions would log which objects are destroyed.
+  gc_sweep(&arena); // Expect: No objects are destroyed.
+  gc_mark_dead(test_obj1);
+  gc_sweep(&arena); // Expect: `test_obj` is destroyed.
+  gc_mark_dead(test_obj2);
+  gc_sweep(&arena); // Expect: `test_obj2`, `number0`, `number1` are destroyed.
+  gc_sweep(&arena); // Expect: No Objects are destroyed.
+
+  free_gcarena(arena);
+  return 0;
+}
 ```
 
 ## LICENSE
