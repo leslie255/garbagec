@@ -30,33 +30,47 @@ i32 main() {
 
   // Create number0 object.
   i32 number0_ = 10;
-  GcPtr number0 = gc_new_object(&arena, PUT_ON_HEAP(number0_), new_objlist(), NO_DESTORY_CALLBACK);
+  GcPtr number0 = gc_new_object(&arena,
+                                PUT_ON_HEAP(number0_),
+                                new_objlist(),
+                                NO_DESTORY_CALLBACK);
 
   // Create number1 object.
   i32 number1_ = 255;
-  GcPtr number1 = gc_new_object(&arena, PUT_ON_HEAP(number1_), new_objlist(), NO_DESTORY_CALLBACK);
+  GcPtr number1 = gc_new_object(&arena,
+                                PUT_ON_HEAP(number1_),
+                                new_objlist(),
+                                NO_DESTORY_CALLBACK);
 
   // Create test_obj1 object.
   TestObj test_obj1_ = (TestObj){
-      .child_i32_0 = gc_clone(number0),
-      .child_i32_1 = gc_clone(number1),
+    .child_i32_0 = gc_clone(number0),
+    .child_i32_1 = gc_clone(number1),
   };
-  GcPtr test_obj1 = gc_new_object(&arena, PUT_ON_HEAP(test_obj1_), test_obj_reflist(&test_obj1_), NO_DESTORY_CALLBACK);
+  GcPtr test_obj1 = gc_new_object(&arena,
+                                  PUT_ON_HEAP(test_obj1_),
+                                  test_obj_reflist(&test_obj1_),
+                                  NO_DESTORY_CALLBACK);
 
   // Create test_obj2 object.
   TestObj test_obj2_ = (TestObj){
-      .child_i32_0 = number0,
-      .child_i32_1 = number1,
+    .child_i32_0 = number0,
+    .child_i32_1 = number1,
   };
-  GcPtr test_obj2 = gc_new_object(&arena, PUT_ON_HEAP(test_obj2_), test_obj_reflist(&test_obj2_), NO_DESTORY_CALLBACK);
+  GcPtr test_obj2 = gc_new_object(&arena,
+                                  PUT_ON_HEAP(test_obj2_),
+                                  test_obj_reflist(&test_obj2_),
+                                  NO_DESTORY_CALLBACK);
 
-  // Print out addresses of GC pointers so later we can see which objects are destroyed.
+  // Print out addresses of GC pointers so later we can see which objects are
+  // destroyed.
   DBG_PRINTF("number0   = "); println_gcptr_addr(number0);
   DBG_PRINTF("number1   = "); println_gcptr_addr(number1);
   DBG_PRINTF("test_obj1 = "); println_gcptr_addr(test_obj1);
   DBG_PRINTF("test_obj2 = "); println_gcptr_addr(test_obj2);
 
-  // Since we defined `DEBUG_LOG` ealier the `gc_sweep` functions would log which objects are destroyed.
+  // Since we defined `DEBUG_LOG` ealier the `gc_sweep` functions would log
+  // which objects are destroyed.
   gc_sweep(&arena); // Expect: No objects are destroyed.
   gc_mark_dead(test_obj1);
   gc_sweep(&arena); // Expect: `test_obj` is destroyed.
