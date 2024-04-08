@@ -27,9 +27,7 @@ typedef ssize_t isize;
 
 #define PUT_ON_HEAP(X) memcpy(malloc(sizeof(X)), &X, sizeof(X))
 
-// Pretty sure `_lbvm` prefixes are safe to use despite starting with underscore.
-// Unless Louisiana Board of Veterinary Medicine uses this prefix in their C projects.
-void _lbvm_print_stacktrace() {
+void print_stacktrace() {
   void *callstack[128];
   int frames = backtrace(callstack, 128);
   char **strs = backtrace_symbols(callstack, frames);
@@ -44,13 +42,13 @@ void _lbvm_print_stacktrace() {
   (((COND))                                                                                                            \
        ? 0                                                                                                             \
        : (fprintf(stderr, "[%s@%s:%d] Assertion failed: (" #COND ") == false\n", __FUNCTION__, __FILE__, __LINE__),    \
-          _lbvm_print_stacktrace(), exit(1)))
+          print_stacktrace(), exit(1)))
 /// Assert with stacktrace and print message on failure.
 #define ASSERT_PRINT(COND, ...)                                                                                        \
   (((COND))                                                                                                            \
        ? 0                                                                                                             \
        : (fprintf(stderr, "[%s@%s:%d] Assertion failed: (" #COND ") == false\n", __FUNCTION__, __FILE__, __LINE__),    \
-          fprintf(stderr, __VA_ARGS__), _lbvm_print_stacktrace(), exit(1)))
+          fprintf(stderr, __VA_ARGS__), print_stacktrace(), exit(1)))
 
 #ifdef DEBUG
 /// Assert only in debug mode with stacktrace on failure.
@@ -58,23 +56,23 @@ void _lbvm_print_stacktrace() {
   (((COND))                                                                                                            \
        ? 0                                                                                                             \
        : (fprintf(stderr, "[%s@%s:%d] Assertion failed: (" #COND ") == false\n", __FUNCTION__, __FILE__, __LINE__),    \
-          _lbvm_print_stacktrace(), exit(1)))
+          print_stacktrace(), exit(1)))
 /// Assert only in debug mode with stacktrace and print message on failure.
 #define DEBUG_ASSERT_PRINT(COND, ...)                                                                                  \
   (((COND))                                                                                                            \
        ? 0                                                                                                             \
        : (fprintf(stderr, "[%s@%s:%d] Assertion failed: (" #COND ") == false\n", __FUNCTION__, __FILE__, __LINE__),    \
-          fprintf(stderr, __VA_ARGS__), _lbvm_print_stacktrace(), exit(1)))
+          fprintf(stderr, __VA_ARGS__), print_stacktrace(), exit(1)))
 #else
 #define DEBUG_ASSERT(COND) 0
 #define DEBUG_ASSERT_PRINT(COND, ...) 0
 #endif
 
 #define PANIC()                                                                                                        \
-  (fprintf(stderr, "[%s@%s:%d] PANIC\n", __FUNCTION__, __FILE__, __LINE__), _lbvm_print_stacktrace(), exit(1))
+  (fprintf(stderr, "[%s@%s:%d] PANIC\n", __FUNCTION__, __FILE__, __LINE__), print_stacktrace(), exit(1))
 #define PANIC_PRINT(...)                                                                                               \
   (fprintf(stderr, "[%s@%s:%d] PANIC\n", __FUNCTION__, __FILE__, __LINE__), fprintf(stderr, __VA_ARGS__),              \
-   _lbvm_print_stacktrace(), exit(1))
+   print_stacktrace(), exit(1))
 
 /// Return `0` to the caller if value is `0`
 #define TRY_NULL(X)                                                                                                    \
