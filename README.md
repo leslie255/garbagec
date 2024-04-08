@@ -97,8 +97,8 @@ Running the above code produces:
 
 ```
 $ make all MODE=release
-clang -Wall -Wconversion --std=gnu2x -g -O0 -DDEBUG -c src/main.c -o bin/main.o
-clang -Wall -Wconversion --std=gnu2x -g -O0 -DDEBUG bin/*.o -o bin/garbagec
+clang -Wall -Wconversion --std=gnu2x -O2 -c src/main.c -o bin/main.o
+clang -Wall -Wconversion --std=gnu2x -O2 bin/*.o -o bin/garbagec
 $ ./bin/garbagec                                   
 [main@src/main.c:210] number0   = gcptr(obj: 0x13d605fe0, metadata: 0x13d605f40)
 [main@src/main.c:211] number1   = gcptr(obj: 0x13d6061a0, metadata: 0x13d606100)
