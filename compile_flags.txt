@@ -1,0 +1,4 @@
+-Wall
+-std=gnu2x
+-Wconversion
+-DDEBUG
