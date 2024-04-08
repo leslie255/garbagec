@@ -93,6 +93,27 @@ i32 main() {
 }
 ```
 
+Running the above code produces:
+
+```
+$ make all MODE=release
+clang -Wall -Wconversion --std=gnu2x -g -O0 -DDEBUG -c src/main.c -o bin/main.o
+clang -Wall -Wconversion --std=gnu2x -g -O0 -DDEBUG bin/*.o -o bin/garbagec
+$ ./bin/garbagec                                   
+[main@src/main.c:210] number0   = gcptr(obj: 0x13d605fe0, metadata: 0x13d605f40)
+[main@src/main.c:211] number1   = gcptr(obj: 0x13d6061a0, metadata: 0x13d606100)
+[main@src/main.c:212] test_obj1 = gcptr(obj: 0x13d606080, metadata: 0x13d605dd0)
+[main@src/main.c:213] test_obj2 = gcptr(obj: 0x13d605e00, metadata: 0x13d605e40)
+[gc_sweep@src/main.c:139] Sweeping starts
+[gc_sweep@src/main.c:139] Sweeping starts
+[gcarena_perform_destroys@src/main.c:124] destroying object: gcptr(obj: 0x13d606080, metadata: 0x13d605dd0)
+[gc_sweep@src/main.c:139] Sweeping starts
+[gcarena_perform_destroys@src/main.c:124] destroying object: gcptr(obj: 0x13d605fe0, metadata: 0x13d605f40)
+[gcarena_perform_destroys@src/main.c:124] destroying object: gcptr(obj: 0x13d6061a0, metadata: 0x13d606100)
+[gcarena_perform_destroys@src/main.c:124] destroying object: gcptr(obj: 0x13d605e00, metadata: 0x13d605e40)
+[gc_sweep@src/main.c:139] Sweeping starts
+```
+
 ## LICENSE
 
 This project is licensed under GPLv3.
