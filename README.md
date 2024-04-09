@@ -52,7 +52,7 @@ i32 main() {
                                 new_objlist(),
                                 NO_DESTORY_CALLBACK);
 
-  // Create test_obj1 object which contains one alias of `number0` and
+  // Create `test_obj1` object which contains one alias of `number0` and
   // `number1`.
   TestObj test_obj1_ = (TestObj){
     .child_i32_0 = gc_clone(number0),
@@ -63,7 +63,7 @@ i32 main() {
                                   test_obj_reflist(&test_obj1_),
                                   NO_DESTORY_CALLBACK);
 
-  // Create `test_obj1` object which contains another alias (but the same copy
+  // Create `test_obj2` object which contains another alias (but the same copy
   // in memory!) of `number0` and `number1`.
   TestObj test_obj2_ = (TestObj){
     .child_i32_0 = number0, // Unlike for `test_obj1`, here we're moving the
