@@ -67,7 +67,8 @@ i32 main() {
   // in memory!) of `number0` and `number1`.
   TestObj test_obj2_ = (TestObj){
     .child_i32_0 = number0, // Unlike for `test_obj1`, here we're moving the
-                            // number objects into `test_obj2`.
+                            // number objects into `test_obj2`, since this is
+                            // the last time we use them in `main`.
     .child_i32_1 = number1,
   };
   GcPtr test_obj2 = gc_new_object(&arena,
