@@ -1,12 +1,33 @@
 #include "common.h"
 #include "debug_utils.h"
 #include <assert.h>
+#include <complex.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 typedef struct gcptr GcPtr;
+
+/// Immutable length heap array of booleans.
+typedef struct boolarray {
+  bool *items;
+  usize len;
+} BoolArray;
+
+static inline BoolArray new_boolarray(usize len) {
+  bool *items = xalloc(bool, len);
+  bzero(items, len);
+  return (BoolArray){.items = items, .len = len};
+}
+
+static inline bool *get_item_boolarray(BoolArray *self, usize i) {
+  DEBUG_ASSERT(self->items != nullptr);
+  DEBUG_ASSERT(i < self->len);
+  return &self->items[i];
+}
+
+static inline void free_boolarray(BoolArray self) { free(self.items); }
 
 typedef struct objlist {
   /// Null for init.
@@ -125,22 +146,22 @@ GcPtr gc_clone(GcPtr p) {
 
 static inline bool gcobject_alive(GcPtr object) { return object.metadata->strong_count != 0; }
 
-static inline void gcarena_sweep_refs(GcArena *self, GcPtr object) {
-  if (!gcobject_alive(object)) {
+static inline void gcarena_recursive_mark_alive(GcArena *self, GcPtr object, usize object_idx, BoolArray *markers) {
+  if (gcobject_alive(object)) {
+    *get_item_boolarray(markers, object_idx) = true;
     for (usize i = 0; i < object.metadata->reflist.len; ++i) {
       GcPtr object_ = *get_item_objlist(&object.metadata->reflist, i);
-      object_.metadata->strong_count -= 1;
-      gcarena_sweep_refs(self, object_);
+      gcarena_recursive_mark_alive(self, object_, i, markers);
     }
   }
 }
 
-static inline void gcarena_perform_destroys(GcArena *self) {
+static inline void gcarena_perform_destroys(GcArena *self, BoolArray *markers) {
   ObjList new_objects = new_objlist();
   for (usize i = 0; i < self->objects.len; ++i) {
-    GcPtr object = *get_item_objlist(&self->objects, i);
-    bool is_alive = object.metadata->strong_count != 0;
+    bool is_alive = *get_item_boolarray(markers, i);
     if (is_alive) {
+      GcPtr object = *get_item_objlist(&self->objects, i);
       push_objlist(&new_objects, object);
     } else {
       GcPtr object = *get_item_objlist(&self->objects, i);
@@ -158,10 +179,13 @@ void gc_sweep(GcArena *self) {
 #ifdef DEBUG_LOG
   DBG_PRINTF("Sweeping starts\n");
 #endif
+  BoolArray markers = new_boolarray(self->objects.len);
   for (usize i = 0; i < self->objects.len; ++i) {
-    gcarena_sweep_refs(self, *get_item_objlist(&self->objects, i));
+    GcPtr object = *get_item_objlist(&self->objects, i);
+    gcarena_recursive_mark_alive(self, object, i, &markers);
   }
-  gcarena_perform_destroys(self);
+  gcarena_perform_destroys(self, &markers);
+  free_boolarray(markers);
 }
 
 /// `value` is the unique pointer to the value on heap.
@@ -186,76 +210,37 @@ void gc_mark_dead(GcPtr object) {
 
 #define GC_GET(TY, PTR) ((const TY *)((PTR).obj))
 
-typedef struct test_obj {
-  GcPtr child_i32_0;
-  GcPtr string;
-} TestObj;
+typedef struct node {
+  GcPtr next;
+} Node;
 
-ObjList test_obj_reflist(TestObj *self) {
-  DEBUG_ASSERT(self->child_i32_0.obj != nullptr);
-  DEBUG_ASSERT(self->string.obj != nullptr);
-  ObjList reflist = new_with_capacity_objlist(2);
-  push_objlist(&reflist, self->child_i32_0);
-  push_objlist(&reflist, self->string);
-  return reflist;
-}
-
-const char **get_string(GcPtr test_obj) {
-  const TestObj *test_obj_ = GC_GET(TestObj, test_obj);
-  return GC_GET(char *, test_obj_->string);
-}
-
-void destroy_string(void *p) {
-  char *s = *PTR_CAST(char **, p);
-  DBG_PRINTF("%s\n", s);
-  xfree(s);
+static inline GcPtr node_to_gcobject(GcArena *arena, Node node) {
+  ObjList objlist = new_with_capacity_objlist(1);
+  push_objlist(&objlist, node.next);
+  return gc_new_object(arena, PUT_ON_HEAP(node), objlist, NO_DESTORY_CALLBACK);
 }
 
 i32 main() {
   GcArena arena = gc_new_arena();
 
-  // The simplist GC object (No custom destroyer, no child objects).
-  i32 number_ = 10;
-  GcPtr number = gc_new_object(&arena, PUT_ON_HEAP(number_), new_objlist(), NO_DESTORY_CALLBACK);
+  GcPtr node0 = node_to_gcobject(&arena, (Node){0});
+  GcPtr node1 = node_to_gcobject(&arena, (Node){.next = node0});
+  GcPtr node2 = node_to_gcobject(&arena, (Node){.next = node1});
 
-  // A GC Object with a custome destroyer.
-  const char s[] = "hello, world";
-  char *string_ = xalloc(char, sizeof(s));
-  memcpy(string_, s, sizeof(s));
-  GcPtr string = gc_new_object(&arena, PUT_ON_HEAP(string_), new_objlist(), &destroy_string);
+  // Some not so safe code here to mutate values inside a GcPtr.
+  PTR_CAST(Node *, node0.obj)->next = node2;
+  node0.metadata->reflist.items[0] = node2;
 
-  // Create test_obj1 object.
-  TestObj test_obj1_ = (TestObj){
-      .child_i32_0 = gc_clone(number),
-      .string = gc_clone(string),
-  };
-  GcPtr test_obj1 = gc_new_object(&arena, PUT_ON_HEAP(test_obj1_), test_obj_reflist(&test_obj1_), NO_DESTORY_CALLBACK);
+  println_gcptr_addr(node0);
+  println_gcptr_addr(node1);
+  println_gcptr_addr(node2);
 
-  // Create test_obj2 object.
-  TestObj test_obj2_ = (TestObj){
-      .child_i32_0 = number,
-      .string = string,
-  };
-  GcPtr test_obj2 = gc_new_object(&arena, PUT_ON_HEAP(test_obj2_), test_obj_reflist(&test_obj2_), NO_DESTORY_CALLBACK);
+  gc_mark_dead(node0);
+  gc_mark_dead(node1);
+  gc_mark_dead(node2);
 
-  // Print out addresses of GC pointers so later we can see which objects are destroyed.
-  DBG_PRINTF("number    = ");
-  println_gcptr_addr(number);
-  DBG_PRINTF("string    = ");
-  println_gcptr_addr(string);
-  DBG_PRINTF("test_obj1 = ");
-  println_gcptr_addr(test_obj1);
-  DBG_PRINTF("test_obj2 = ");
-  println_gcptr_addr(test_obj2);
-
-  // Since we defined `DEBUG_LOG` ealier the `gc_sweep` functions would log which objects are destroyed.
-  gc_sweep(&arena); // Expect: No objects are destroyed.
-  gc_mark_dead(test_obj1);
-  gc_sweep(&arena);                  // Expect: `test_obj1` is destroyed.
-  DBG_PRINT(*get_string(test_obj2)); // `test_obj2` is still alive and using `string`, so `string` is not destroyed.
-  gc_mark_dead(test_obj2);
-  gc_sweep(&arena); // Expect: `test_obj2`, `number`, `string` are all destroyed.
-  gc_sweep(&arena); // Expect: No Objects are destroyed.
+  gc_sweep(&arena);
+  gc_sweep(&arena);
 
   free_gcarena(arena);
   return 0;
