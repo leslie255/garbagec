@@ -102,7 +102,21 @@ GcArena gc_new_arena() {
   };
 }
 
-void free_gcarena(GcArena self) { free_objlist(self.objects); }
+static inline void destroy_object(GcPtr object) {
+  if (object.metadata->destroy_callback != nullptr && object.obj != nullptr) {
+    (object.metadata->destroy_callback)((void *)object.obj);
+  }
+  xfree(object.obj);
+  free_metadata(*object.metadata);
+}
+
+void free_gcarena(GcArena self) {
+  for (usize i = 0; i < self.objects.len; ++i) {
+    GcPtr object = *get_item_objlist(&self.objects, i);
+    destroy_object(object);
+  }
+  free_objlist(self.objects);
+}
 
 GcPtr gc_clone(GcPtr p) {
   p.metadata->strong_count += 1;
@@ -113,7 +127,7 @@ static inline bool gcobject_alive(GcPtr object) { return object.metadata->strong
 
 static inline void gcarena_sweep_refs(GcArena *self, GcPtr object) {
   if (!gcobject_alive(object)) {
-    for (usize i = 0; i < object.metadata->reflist.len; i++) {
+    for (usize i = 0; i < object.metadata->reflist.len; ++i) {
       GcPtr object_ = *get_item_objlist(&object.metadata->reflist, i);
       object_.metadata->strong_count -= 1;
       gcarena_sweep_refs(self, object_);
@@ -134,11 +148,7 @@ static inline void gcarena_perform_destroys(GcArena *self) {
       DBG_PRINTF("destroying object: ");
       println_gcptr_addr(object);
 #endif
-      if (object.metadata->destroy_callback != nullptr && object.obj != nullptr) {
-        (object.metadata->destroy_callback)((void *)object.obj);
-      }
-      xfree(object.obj);
-      free_metadata(*object.metadata);
+      destroy_object(object);
     }
   }
   self->objects = new_objects;
@@ -197,7 +207,7 @@ const char **get_string(GcPtr test_obj) {
 
 void destroy_string(void *p) {
   char *s = *PTR_CAST(char **, p);
-  DBG_PRINTF("is called with on string %s\n", s);
+  DBG_PRINTF("%s\n", s);
   xfree(s);
 }
 
@@ -210,7 +220,7 @@ i32 main() {
 
   // A GC Object with a custome destroyer.
   const char s[] = "hello, world";
-  char *string_ = xalloc_(sizeof(s));
+  char *string_ = xalloc(char, sizeof(s));
   memcpy(string_, s, sizeof(s));
   GcPtr string = gc_new_object(&arena, PUT_ON_HEAP(string_), new_objlist(), &destroy_string);
 
