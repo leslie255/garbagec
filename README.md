@@ -31,6 +31,9 @@ ObjList test_obj_reflist(TestObj *self) {
   return reflist;
 }
 
+// So `gc_sweep` would log what object is being destroyed.
+#define DEBUG_LOG
+
 i32 main() {
   GcArena arena = gc_new_arena();
 
@@ -79,8 +82,6 @@ i32 main() {
   DBG_PRINTF("test_obj1 = "); println_gcptr_addr(test_obj1);
   DBG_PRINTF("test_obj2 = "); println_gcptr_addr(test_obj2);
 
-  // Since we defined `DEBUG_LOG` ealier the `gc_sweep` functions would log
-  // which objects are destroyed.
   gc_sweep(&arena); // Expect: No objects are destroyed.
   gc_mark_dead(test_obj1);
   gc_sweep(&arena); // Expect: `test_obj1` is destroyed.
