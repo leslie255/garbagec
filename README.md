@@ -31,9 +31,6 @@ ObjList test_obj_reflist(TestObj *self) {
   return reflist;
 }
 
-// So `gc_sweep` would log what object is being destroyed.
-#define DEBUG_LOG
-
 i32 main() {
   GcArena arena = gc_new_arena();
 
