@@ -41,10 +41,12 @@ typedef void (*DestroyCallback)(void *);
 typedef struct obj_metadata {
   ObjList reflist;
   usize strong_count;
-  // Function to be called when freeing this object.
-  // Null for do nothing.
-  // Must not call `gc_mark_dead` on child GC objects, as this is managed by its reflist.
+  /// Function to be called when freeing this object.
+  /// Null for do nothing.
+  /// Must not call `gc_mark_dead` on child GC objects, as this is managed by its reflist.
   DestroyCallback destroy_callback;
+  /// The sweep_count when this object is last seen alive.
+  usize last_seen_alive;
 } ObjMetadata;
 
 static inline void free_metadata(ObjMetadata self) { free_objlist(self.reflist); }
@@ -109,6 +111,7 @@ static inline void free_objlist(ObjList self) {
 /// Not thread safe.
 typedef struct gcarena {
   ObjList objects;
+  usize sweep_count;
 } GcArena;
 
 GcArena gc_new_arena() {
@@ -140,12 +143,20 @@ GcPtr gc_clone(GcPtr p) {
 
 static inline bool gcobject_alive(GcPtr object) { return object.metadata->strong_count != 0; }
 
-static inline void gcarena_recursive_mark_alive(GcArena *self, GcPtr object, usize object_idx, BoolArray *markers) {
-  if (gcobject_alive(object)) {
-    *get_item_boolarray(markers, object_idx) = true;
+static inline bool gcobject_sweeped(GcArena *const self, GcPtr object) {
+  return object.metadata->last_seen_alive == self->sweep_count;
+}
+
+static inline void gcobject_mark_alive(GcArena *const self, GcPtr object) {
+  object.metadata->last_seen_alive = self->sweep_count;
+}
+
+static inline void gcarena_recursive_mark_alive(GcArena *self, GcPtr object) {
+  if (gcobject_alive(object) && !gcobject_sweeped(self, object)) {
     for (usize i = 0; i < object.metadata->reflist.len; ++i) {
-      GcPtr object_ = *get_item_objlist(&object.metadata->reflist, i);
-      gcarena_recursive_mark_alive(self, object_, i, markers);
+      GcPtr child = *get_item_objlist(&object.metadata->reflist, i);
+      gcobject_mark_alive(self, child);
+      gcarena_recursive_mark_alive(self, child);
     }
   }
 }
@@ -174,12 +185,14 @@ void gc_sweep(GcArena *self) {
   DBG_PRINTF("Sweeping starts\n");
 #endif
   BoolArray markers = new_boolarray(self->objects.len);
+  BoolArray sweeped = new_boolarray(self->objects.len);
   for (usize i = 0; i < self->objects.len; ++i) {
     GcPtr object = *get_item_objlist(&self->objects, i);
-    gcarena_recursive_mark_alive(self, object, i, &markers);
+    gcarena_recursive_mark_alive(self, object);
   }
   gcarena_perform_destroys(self, &markers);
   free_boolarray(markers);
+  free_boolarray(sweeped);
 }
 
 /// `value` is the unique pointer to the value on heap.
@@ -218,15 +231,20 @@ i32 main() {
   GcArena arena = gc_new_arena();
 
   GcPtr node0 = node_to_gcobject(&arena, (Node){0});
-  GcPtr node1 = node_to_gcobject(&arena, (Node){.next = node0});
-  GcPtr node2 = node_to_gcobject(&arena, (Node){.next = node1});
+  GcPtr node1 = node_to_gcobject(&arena, (Node){.next = gc_clone(node0)});
+  GcPtr node2 = node_to_gcobject(&arena, (Node){.next = gc_clone(node1)});
 
   // Some not so safe code here to mutate values inside a GcPtr.
-  PTR_CAST(Node *, node0.obj)->next = node2;
+  PTR_CAST(Node *, node0.obj)->next = gc_clone(node2);
   node0.metadata->reflist.items[0] = node2;
 
+  gc_sweep(&arena);
+
+  DBG_PRINTF("node0 = ");
   println_gcptr_addr(node0);
+  DBG_PRINTF("node1 = ");
   println_gcptr_addr(node1);
+  DBG_PRINTF("node2 = ");
   println_gcptr_addr(node2);
 
   gc_mark_dead(node0);
