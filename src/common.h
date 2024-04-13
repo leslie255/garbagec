@@ -27,7 +27,7 @@ typedef ssize_t isize;
 
 #define PUT_ON_HEAP(X) memcpy(malloc(sizeof(X)), &X, sizeof(X))
 
-void print_stacktrace() {
+static inline void print_stacktrace() {
   void *callstack[128];
   int frames = backtrace(callstack, 128);
   char **strs = backtrace_symbols(callstack, frames);
