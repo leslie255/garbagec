@@ -6,6 +6,8 @@ It is designed for a possible future programming language project.
 
 For now it's not hygienically packaged into a library.
 
+Note: it has a lot of bugs rn.
+
 ## Demos
 
 ### 1. Without circle tracing:
