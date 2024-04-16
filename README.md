@@ -1,10 +1,10 @@
 # GarbageC
 
-**Tracing GC (a.k.a. Mark & Sweep GC) implemented in C**
+**Tracing GC (aka. Mark & Sweep GC) implemented in C**
 
 It is designed for a runtime of a possible future programming language project, not use within C projects.
 
-## Demo 1. Without circle referencing:
+## Demo 1: Without circle referencing
 
 ```c
 #include "common.h"
@@ -109,7 +109,7 @@ $ ./bin/garbagec
 [gc_sweep@src/gc.c:113] Sweeping starts
 ```
 
-### Demo 2. With circle referencing:
+### Demo 2: With circle referencing
 
 ```c
 #include "common.h"
