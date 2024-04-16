@@ -16,28 +16,21 @@ i32 main() {
   GcArena arena = gc_new_arena();
 
   GcPtr node0 = node_to_gcobject(&arena, (Node){0});
-  GcPtr node1 = node_to_gcobject(&arena, (Node){.next = gc_clone(node0)});
-  GcPtr node2 = node_to_gcobject(&arena, (Node){.next = gc_clone(node1)});
+  GcPtr node1 = node_to_gcobject(&arena, (Node){.next = node0});
 
   // Some not so safe code here to mutate values inside a GcPtr.
-  PTR_CAST(Node *, node0.obj)->next = gc_clone(node2);
-  node0.metadata->reflist.items[0] = node2;
+  PTR_CAST(Node *, node0.obj)->next = node1;
+  node0.metadata->reflist.items[0] = node1;
 
   DBG_PRINTF("node0 = ");
   gc_println_ptr(&node0);
   DBG_PRINTF("node1 = ");
   gc_println_ptr(&node1);
-  DBG_PRINTF("node2 = ");
-  gc_println_ptr(&node2);
 
+  gc_enters_scope(node0);
   gc_sweep(&arena);
-
-  gc_mark_dead(node0);
-  gc_mark_dead(node1);
-  gc_mark_dead(node2);
-
+  gc_leaves_scope(node0);
   gc_sweep(&arena);
-  // gc_sweep(&arena);
 
   // gc_free_arena(arena);
   return 0;

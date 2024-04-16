@@ -19,14 +19,23 @@ typedef void (*DestroyCallback)(void *);
 
 #define NO_DESTORY_CALLBACK ((DestroyCallback) nullptr)
 
+/// The metadata attached to a GC object.
 typedef struct gc_metadata {
+  /// The child objects of this GC object.
   GcObjlist reflist;
+  /// The number of references from outside the GC.
+  /// Meaning it does not include references that is in the `reflist` of other GC objects.
+  /// Object with `strong_count > 0` is effectively the root objects of the arena.
   usize strong_count;
   /// Function to be called when freeing this object.
   /// Null for do nothing.
-  /// Must not call `gc_mark_dead` on child GC objects, as this is managed by its reflist.
+  /// IMPORTANT:
+  /// It is not the responsibility of an object's `destroy_callback` to free its child objects, doing this results in
+  /// undefined behavior.
   DestroyCallback destroy_callback;
-  /// The sweep_count when this object is last seen alive.
+  /// PRIVATE FIELD.
+  /// The `sweep_count` of the arena when this object is last seen alive.
+  /// This is the "mark" in "mark & sweep GC".
   usize last_seen_alive;
 } GcMetadata;
 
@@ -59,14 +68,13 @@ GcArena gc_new_arena();
 
 void gc_free_arena(GcArena);
 
-GcPtr gc_clone(GcPtr p);
-
 void gc_sweep(GcArena *);
 
 /// `value` is the unique pointer to the value on heap.
 GcPtr gc_new_object(GcArena *, void *restrict value, GcObjlist reflist, DestroyCallback destroy_callback);
 
-void gc_mark_dead(GcPtr object);
+void gc_enters_scope(GcPtr);
+void gc_leaves_scope(GcPtr);
 
 #define GC_GET(TY, PTR) ((const TY *)((PTR).obj))
 

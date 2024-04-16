@@ -43,7 +43,10 @@ GcPtr *gc_get_item_objlist(GcObjlist *self, usize i) {
   return &self->items[i];
 }
 
-void gc_free_objlist(GcObjlist self) { xfree(self.items); }
+void gc_free_objlist(GcObjlist self) {
+  if (self.items != nullptr)
+    xfree(self.items);
+}
 
 GcArena gc_new_arena() {
   return (GcArena){
@@ -52,9 +55,8 @@ GcArena gc_new_arena() {
 }
 
 static inline void destroy_object(GcPtr object) {
-  if (object.metadata->destroy_callback != nullptr && object.obj != nullptr) {
+  if (object.metadata->destroy_callback != nullptr && object.obj != nullptr)
     (object.metadata->destroy_callback)((void *)object.obj);
-  }
   xfree(object.obj);
   gc_free_metadata(*object.metadata);
 }
@@ -67,37 +69,23 @@ void gc_free_arena(GcArena self) {
   gc_free_objlist(self.objects);
 }
 
-GcPtr gc_clone(GcPtr p) {
-  p.metadata->strong_count += 1;
-  return p;
-}
+static inline bool is_root(GcPtr object) { return object.metadata->strong_count != 0; }
 
-static inline bool object_is_alive(GcPtr object) { return object.metadata->strong_count != 0; }
-
-static inline bool object_seen_this_round(GcArena *const self, GcPtr object) {
+static inline bool is_seen_this_round(GcArena *const self, GcPtr object) {
   return object.metadata->last_seen_alive == self->sweep_count;
 }
 
-static inline void object_mark_alive(GcArena *self, GcPtr object) {
+static inline void mark_alive(GcArena *self, GcPtr object) {
   object.metadata->last_seen_alive = self->sweep_count;
 }
 
 static inline void gcarena_recursive_mark_alive(GcArena *self, GcPtr object) {
-  print_stacktrace();
-  DBG_PRINTF("looking at: ");
-  gc_println_ptr(&object);
-  if (object_seen_this_round(self, object)) {
-    DBG_PRINTF("seen before, skipping\n");
+  if (is_seen_this_round(self, object))
     return;
-  }
-  DBG_PRINTF("children:");
-  gc_println_objlist(&object.metadata->reflist);
-  object_mark_alive(self, object);
-  if (object_is_alive(object)) {
-    for (usize i = 0; i < object.metadata->reflist.len; ++i) {
-      GcPtr child = *gc_get_item_objlist(&object.metadata->reflist, i);
-      gcarena_recursive_mark_alive(self, child);
-    }
+  mark_alive(self, object);
+  for (usize i = 0; i < object.metadata->reflist.len; ++i) {
+    GcPtr child = *gc_get_item_objlist(&object.metadata->reflist, i);
+    gcarena_recursive_mark_alive(self, child);
   }
 }
 
@@ -125,18 +113,11 @@ void gc_sweep(GcArena *self) {
   DBG_PRINTF("Sweeping starts\n");
 #endif
   self->sweep_count += 1;
-  DBG_PRINT(self->sweep_count);
-  DBG_PRINTF("Before:\n");
-  for (usize i = 0; i < self->objects.len; ++i) {
-    gc_println_ptr(gc_get_item_objlist(&self->objects, i));
-  }
   for (usize i = 0; i < self->objects.len; ++i) {
     GcPtr object = *gc_get_item_objlist(&self->objects, i);
-    gcarena_recursive_mark_alive(self, object);
-  }
-  DBG_PRINTF("After:\n");
-  for (usize i = 0; i < self->objects.len; ++i) {
-    gc_println_ptr(gc_get_item_objlist(&self->objects, i));
+    if (is_root(object)) {
+      gcarena_recursive_mark_alive(self, object);
+    }
   }
   do_destroys(self);
 }
@@ -145,7 +126,7 @@ void gc_sweep(GcArena *self) {
 GcPtr gc_new_object(GcArena *self, void *restrict value, GcObjlist reflist, DestroyCallback destroy_callback) {
   GcMetadata metadata = (GcMetadata){
       .reflist = reflist,
-      .strong_count = 1,
+      .strong_count = 0,
       .destroy_callback = destroy_callback,
       .last_seen_alive = self->sweep_count,
   };
@@ -157,7 +138,9 @@ GcPtr gc_new_object(GcArena *self, void *restrict value, GcObjlist reflist, Dest
   return obj;
 }
 
-void gc_mark_dead(GcPtr object) {
+void gc_enters_scope(GcPtr p) { p.metadata->strong_count += 1; }
+
+void gc_leaves_scope(GcPtr object) {
   DEBUG_ASSERT(object.metadata->strong_count != 0);
   object.metadata->strong_count -= 1;
 }

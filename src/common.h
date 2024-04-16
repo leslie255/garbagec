@@ -68,8 +68,7 @@ static inline void print_stacktrace() {
 #define DEBUG_ASSERT_PRINT(COND, ...) 0
 #endif
 
-#define PANIC()                                                                                                        \
-  (fprintf(stderr, "[%s@%s:%d] PANIC\n", __FUNCTION__, __FILE__, __LINE__), print_stacktrace(), exit(1))
+#define PANIC() (fprintf(stderr, "[%s@%s:%d] PANIC\n", __FUNCTION__, __FILE__, __LINE__), print_stacktrace(), exit(1))
 #define PANIC_PRINT(...)                                                                                               \
   (fprintf(stderr, "[%s@%s:%d] PANIC\n", __FUNCTION__, __FILE__, __LINE__), fprintf(stderr, __VA_ARGS__),              \
    print_stacktrace(), exit(1))
