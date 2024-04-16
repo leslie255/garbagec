@@ -8,12 +8,7 @@ For now it's not hygienically packaged into a library.
 
 Note: it has a lot of bugs rn.
 
-## Demos
-
-### 1. Without circle tracing:
-
-Note that this demo code requires `common.h` and `debug_utils.h`, as well as `#define DEBUG_LOG` so the `gc_sweep`
-function logs what objects are destroyed.
+## Demo 1. Without circle tracing:
 
 ```c
 /// A TestObj has two child i32 values allocated in GC arena.
@@ -117,16 +112,20 @@ $ ./bin/garbagec
 [gc_sweep@src/main.c:139] Sweeping starts
 ```
 
-### 2. With circle referencing:
+### Demo 2. With circle referencing:
 
 ```c
+#include "common.h"
+#include "debug_utils.h"
+#include "gc.h"
+
 typedef struct node {
   GcPtr next;
 } Node;
 
 static inline GcPtr node_to_gcobject(GcArena *arena, Node node) {
-  ObjList objlist = new_with_capacity_objlist(1);
-  push_objlist(&objlist, node.next);
+  GcObjlist objlist = gc_new_objlist_with_capacity(1);
+  gc_push_objlist(&objlist, node.next);
   return gc_new_object(arena, PUT_ON_HEAP(node), objlist, NO_DESTORY_CALLBACK);
 }
 
@@ -135,27 +134,23 @@ i32 main() {
 
   GcPtr node0 = node_to_gcobject(&arena, (Node){0});
   GcPtr node1 = node_to_gcobject(&arena, (Node){.next = node0});
-  GcPtr node2 = node_to_gcobject(&arena, (Node){.next = node1});
 
-  // Some not so safe code here to mutate values inside a GcPtr, such that
-  // `node2.next` points back to `node0`.
-  PTR_CAST(Node *, node0.obj)->next = node2;
-  node0.metadata->reflist.items[0] = node2;
+  // Some not so safe code here to mutate values inside a GcPtr.
+  PTR_CAST(Node *, node0.obj)->next = node1;
+  node0.metadata->reflist.items[0] = node1;
 
-  DBG_PRINTF("node0 = "); println_gcptr_addr(node0);
-  DBG_PRINTF("node1 = "); println_gcptr_addr(node1);
-  DBG_PRINTF("node2 = "); println_gcptr_addr(node2);
+  printf("node0 = ");
+  gc_println_ptr_addr(&node0);
+  printf("node1 = ");
+  gc_println_ptr_addr(&node1);
 
-  gc_sweep(&arena); // Expect: No objects destroyed.
+  gc_enters_scope(node0);
+  gc_sweep(&arena);           // Expect: no object destroyed.
+  gc_leaves_scope(node0);
+  gc_sweep(&arena);           // Expect: both nodes destroyed.
+  gc_sweep(&arena);           // Expect: no object destroyed.
 
-  gc_mark_dead(node0);
-  gc_mark_dead(node1);
-  gc_mark_dead(node2);
-
-  gc_sweep(&arena); // Expect: All three objects destroyed.
-  gc_sweep(&arena); // Expect: No objects destroyed.
-
-  free_gcarena(arena);
+  gc_free_arena(arena);
   return 0;
 }
 ```
@@ -166,17 +161,10 @@ Result:
 $ mkdir bin/
 $ make all MODE=release
 clang -Wall -Wconversion --std=gnu2x -O2 -c src/main.c -o bin/main.o
-clang -Wall -Wconversion --std=gnu2x -O2 bin/*.o -o bin/garbagec
+clang -Wall -Wconversion --std=gnu2x -O2 -c src/gc.c -o bin/gc.o
+clang -Wall -Wconversion --std=gnu2x -O2 bin/main.o bin/gc.o -o bin/garbagec
 $ ./bin/garbagec
-[main@src/main.c:228] node0 = gcptr(obj: 0x14d6061a0, metadata: 0x14d605f40)
-[main@src/main.c:229] node1 = gcptr(obj: 0x14d606100, metadata: 0x14d606110)
-[main@src/main.c:230] node2 = gcptr(obj: 0x14d606090, metadata: 0x14d605dd0)
-[gc_sweep@src/main.c:174] Sweeping starts
-[gc_sweep@src/main.c:174] Sweeping starts
-[gcarena_perform_destroys@src/main.c:163] destroying object: gcptr(obj: 0x14d6061a0, metadata: 0x14d605f40)
-[gcarena_perform_destroys@src/main.c:163] destroying object: gcptr(obj: 0x14d606100, metadata: 0x14d606110)
-[gcarena_perform_destroys@src/main.c:163] destroying object: gcptr(obj: 0x14d606090, metadata: 0x14d605dd0)
-[gc_sweep@src/main.c:174] Sweeping starts
+
 ```
 
 ## LICENSE
