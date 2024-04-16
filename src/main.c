@@ -1,3 +1,4 @@
+
 #include "common.h"
 #include "debug_utils.h"
 #include "gc.h"
@@ -22,16 +23,18 @@ i32 main() {
   PTR_CAST(Node *, node0.obj)->next = node1;
   node0.metadata->reflist.items[0] = node1;
 
-  DBG_PRINTF("node0 = ");
-  gc_println_ptr(&node0);
-  DBG_PRINTF("node1 = ");
-  gc_println_ptr(&node1);
+  printf("node0 = ");
+  gc_println_ptr_addr(&node0);
+  printf("node1 = ");
+  gc_println_ptr_addr(&node1);
 
   gc_enters_scope(node0);
-  gc_sweep(&arena);
+  gc_sweep(&arena);           // Expect: no object destroyed.
   gc_leaves_scope(node0);
-  gc_sweep(&arena);
+  gc_sweep(&arena);           // Expect: both nodes destroyed.
+  gc_sweep(&arena);           // Expect: no object destroyed.
 
-  // gc_free_arena(arena);
+  gc_free_arena(arena);
   return 0;
 }
+
