@@ -6,8 +6,6 @@ It is designed for a possible future programming language project.
 
 For now it's not hygienically packaged into a library.
 
-Note: it has a lot of bugs rn.
-
 ## Demo 1. Without circle tracing:
 
 ```c
@@ -24,9 +22,6 @@ typedef struct test_obj {
 /// A GC object needs to have a reflist for all child objects it has.
 /// `reflist`s takes the type of `GcObjlist`, a dynamic array of `GcPtr`s.
 GcObjlist test_obj_reflist(TestObj *self) {
-  // `DEBUG_ASSERT` is a macro defined in `common.h`.
-  DEBUG_ASSERT(self->child_i32_0.obj != nullptr);
-  DEBUG_ASSERT(self->child_i32_1.obj != nullptr);
   GcObjlist reflist = gc_new_objlist_with_capacity(2);
   gc_push_objlist(&reflist, self->child_i32_0);
   gc_push_objlist(&reflist, self->child_i32_1);
