@@ -2,7 +2,7 @@
 
 **Tracing GC (a.k.a. Mark & Sweep GC) implemented in C**
 
-It is designed for a possible future programming language project, not use within C projects.
+It is designed for a runtime of a possible future programming language project, not use within C projects.
 
 ## Demo 1. Without circle referencing:
 
