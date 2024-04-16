@@ -6,7 +6,7 @@ It is designed for a possible future programming language project.
 
 For now it's not hygienically packaged into a library.
 
-## Demo 1. Without circle tracing:
+## Demo 1. Without circle referencing:
 
 ```c
 #include "common.h"
@@ -46,7 +46,19 @@ i32 main() {
                                 gc_new_objlist(),
                                 NO_DESTORY_CALLBACK);
 
-  // Create `test_obj1` object which contains one alias of `number0` and
+  // Create `test_obj0` object which contains one alias of `number0` and
+  // `number1`.
+  TestObj test_obj0_ = (TestObj){
+    .child_i32_0 = number0,
+    .child_i32_1 = number1,
+  };
+  GcPtr test_obj0 = gc_new_object(&arena,
+                                  PUT_ON_HEAP(test_obj0_),
+                                  test_obj_reflist(&test_obj0_),
+                                  NO_DESTORY_CALLBACK);
+  gc_enters_scope(test_obj0);
+
+  // Create `test_obj1` object which contains another alias of `number0` and
   // `number1`.
   TestObj test_obj1_ = (TestObj){
     .child_i32_0 = number0,
@@ -58,30 +70,18 @@ i32 main() {
                                   NO_DESTORY_CALLBACK);
   gc_enters_scope(test_obj1);
 
-  // Create `test_obj2` object which contains another alias (but the same copy
-  // in memory!) of `number0` and `number1`.
-  TestObj test_obj2_ = (TestObj){
-    .child_i32_0 = number0,
-    .child_i32_1 = number1,
-  };
-  GcPtr test_obj2 = gc_new_object(&arena,
-                                  PUT_ON_HEAP(test_obj2_),
-                                  test_obj_reflist(&test_obj2_),
-                                  NO_DESTORY_CALLBACK);
-  gc_enters_scope(test_obj2);
-
   // Print out addresses of GC pointers so later we can see which objects are
   // destroyed.
   DBG_PRINTF("number0   = "); gc_println_ptr_addr(&number0);
   DBG_PRINTF("number1   = "); gc_println_ptr_addr(&number1);
+  DBG_PRINTF("test_obj0 = "); gc_println_ptr_addr(&test_obj0);
   DBG_PRINTF("test_obj1 = "); gc_println_ptr_addr(&test_obj1);
-  DBG_PRINTF("test_obj2 = "); gc_println_ptr_addr(&test_obj2);
 
   gc_sweep(&arena); // Expect: No objects are destroyed.
+  gc_leaves_scope(test_obj0);
+  gc_sweep(&arena); // Expect: `test_obj0` is destroyed.
   gc_leaves_scope(test_obj1);
-  gc_sweep(&arena); // Expect: `test_obj1` is destroyed.
-  gc_leaves_scope(test_obj2);
-  gc_sweep(&arena); // Expect: `test_obj2`, `number0`, `number1` are destroyed.
+  gc_sweep(&arena); // Expect: `test_obj1`, `number0`, `number1` are destroyed.
   gc_sweep(&arena); // Expect: No Objects are destroyed.
 
   gc_free_arena(arena);
